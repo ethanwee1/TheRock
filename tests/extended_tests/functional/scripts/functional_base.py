@@ -24,7 +24,11 @@ sys.path.insert(
 from utils import ExtendedTestClient
 from utils.logger import log
 from utils.exceptions import TestExecutionError, TestResultError
-from github_actions_utils import gha_append_step_summary, get_first_gpu_architecture, get_visible_gpu_count
+from github_actions_utils import (
+    gha_append_step_summary,
+    get_first_gpu_architecture,
+    get_visible_gpu_count,
+)
 
 
 class FunctionalBase:

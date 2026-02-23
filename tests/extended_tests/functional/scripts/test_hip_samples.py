@@ -28,18 +28,22 @@ class HipSamplesTest(FunctionalBase):
         super().__init__(test_name="hip_samples", display_name="HIP Samples")
 
         self.results_json = self.script_dir / "hip_samples_results.json"
-        
+
         # Load test configurations from JSON
         config = self.load_config("hip_samples.json")
-        
+
         # Source directory for building from source
         self.rocm_systems_dir = self.therock_dir / "rocm-systems"
-        self.hip_tests_samples_dir = self.rocm_systems_dir / "projects" / "hip-tests" / "samples"
-        self.hip_tests_build_dir = self.rocm_systems_dir / "projects" / "hip-tests" / "build"
+        self.hip_tests_samples_dir = (
+            self.rocm_systems_dir / "projects" / "hip-tests" / "samples"
+        )
+        self.hip_tests_build_dir = (
+            self.rocm_systems_dir / "projects" / "hip-tests" / "build"
+        )
 
         # Store test execution results
         self.test_results = []
-        
+
         # Load configuration from JSON
         self.skip_conditions = config.get("skip_conditions", {})
         self.skip_executables = config.get("skip_executables", [])
@@ -47,7 +51,7 @@ class HipSamplesTest(FunctionalBase):
 
     def _build_sample(self, test_suite: str, testname: str) -> None:
         """Build a single HIP sample in its own build directory.
-        
+
         Builds in {suite}/{testname}/build/ directory, matching the original pattern.
         """
         # Handle nested test cases (e.g., "15_static_library/device_functions")
@@ -58,7 +62,7 @@ class HipSamplesTest(FunctionalBase):
         if not source_dir.exists():
             log.warning(f"Source directory not found: {source_dir}, skipping build")
             return
-        
+
         # Check if CMakeLists.txt exists
         if not (source_dir / "CMakeLists.txt").exists():
             log.warning(f"CMakeLists.txt not found in {source_dir}, skipping build")
@@ -69,7 +73,7 @@ class HipSamplesTest(FunctionalBase):
 
         # Get ROCm environment
         env = self.get_rocm_env()
-        
+
         # Set ROCM_PATH and HIP_PATH environment variables for CMake HIP compiler detection
         # CMakeDetermineHIPCompiler.cmake checks these environment variables before CMakeLists.txt processes -DROCM_PATH
         rocm_path_str = str(self.rocm_path)
@@ -77,7 +81,9 @@ class HipSamplesTest(FunctionalBase):
         env["HIP_PATH"] = rocm_path_str
         env["HIP_PLATFORM"] = "amd"
         # HIP_DEVICE_LIB_PATH helps CMake find ROCm device libraries
-        env["HIP_DEVICE_LIB_PATH"] = str(self.rocm_path / "lib" / "llvm" / "amdgcn" / "bitcode")
+        env["HIP_DEVICE_LIB_PATH"] = str(
+            self.rocm_path / "lib" / "llvm" / "amdgcn" / "bitcode"
+        )
         # Ensure hipcc is in PATH for CMake HIP compiler detection
         rocm_bin = str(self.rocm_path / "bin")
         if "PATH" in env:
@@ -89,7 +95,7 @@ class HipSamplesTest(FunctionalBase):
         source_dir_str = str(source_dir)
         # Use self.rocm_path directly instead of hipconfig -l, which may return /opt/rocm
         amdclang_path = self.rocm_path / "lib" / "llvm" / "bin" / "amdclang++"
-        
+
         # Set ROCM_PATH and CMAKE_PREFIX_PATH so CMake can find ROCm components
         # This is needed when /opt/rocm symlink is not present
         # Use -C to set initial cache values before project() call processes them
@@ -107,12 +113,12 @@ class HipSamplesTest(FunctionalBase):
             special_case = self.special_compiler_cases[testname]
             cxx_compiler = special_case.get("cxx_compiler", "amdclang++")
             fortran_compiler = special_case.get("fortran_compiler")
-            
+
             if cxx_compiler == "clang++":
                 cxx_path = self.rocm_path / "lib" / "llvm" / "bin" / "clang++"
             else:
                 cxx_path = amdclang_path
-            
+
             rocm_path_str = str(self.rocm_path)
             cmake_cmd = [
                 "cmake",
@@ -121,11 +127,17 @@ class HipSamplesTest(FunctionalBase):
                 f"-DCMAKE_PREFIX_PATH:STRING={rocm_path_str};{rocm_path_str}/lib/llvm;{rocm_path_str}/hip",
                 source_dir_str,
             ]
-            
+
             if fortran_compiler:
-                gfortran_result = subprocess.run(["which", fortran_compiler], capture_output=True, text=True)
-                gfortran_path = gfortran_result.stdout.strip() if gfortran_result.returncode == 0 else fortran_compiler
-                cmake_cmd.insert(2, f'FC={gfortran_path}')
+                gfortran_result = subprocess.run(
+                    ["which", fortran_compiler], capture_output=True, text=True
+                )
+                gfortran_path = (
+                    gfortran_result.stdout.strip()
+                    if gfortran_result.returncode == 0
+                    else fortran_compiler
+                )
+                cmake_cmd.insert(2, f"FC={gfortran_path}")
 
         # Run CMake configure
         return_code = self.execute_command(cmake_cmd, cwd=build_dir, env=env)
@@ -138,13 +150,11 @@ class HipSamplesTest(FunctionalBase):
         make_cmd = ["make"]
         return_code = self.execute_command(make_cmd, cwd=build_dir, env=env)
         if return_code != 0:
-            raise TestExecutionError(
-                f"Build failed for {test_suite}/{testname}"
-            )
+            raise TestExecutionError(f"Build failed for {test_suite}/{testname}")
 
     def _initialize_build_environment(self) -> None:
         """Initialize build environment for HIP samples.
-        
+
         Sets up the build directory structure and ensures submodules are initialized.
         Actual building happens per-sample in run_tests().
         """
@@ -159,20 +169,37 @@ class HipSamplesTest(FunctionalBase):
 
         # First, ensure rocm-systems submodule itself is initialized
         log.info("Checking rocm-systems submodule status")
-        rocm_systems_submodule_cmd = ["git", "submodule", "update", "--init", "rocm-systems"]
-        return_code = self.execute_command(rocm_systems_submodule_cmd, cwd=self.therock_dir)
+        rocm_systems_submodule_cmd = [
+            "git",
+            "submodule",
+            "update",
+            "--init",
+            "rocm-systems",
+        ]
+        return_code = self.execute_command(
+            rocm_systems_submodule_cmd, cwd=self.therock_dir
+        )
         if return_code != 0:
-            log.warning("Failed to initialize rocm-systems submodule, continuing anyway")
+            log.warning(
+                "Failed to initialize rocm-systems submodule, continuing anyway"
+            )
 
         # Then, initialize only hip-tests submodule within rocm-systems
         # This is more efficient than updating all rocm-systems submodules
         hip_tests_path = "projects/hip-tests"
         log.info(f"Checking and initializing hip-tests submodule in rocm-systems")
-        
+
         # Try to update only the hip-tests submodule path
-        submodule_cmd = ["git", "submodule", "update", "--init", "--recursive", hip_tests_path]
+        submodule_cmd = [
+            "git",
+            "submodule",
+            "update",
+            "--init",
+            "--recursive",
+            hip_tests_path,
+        ]
         return_code = self.execute_command(submodule_cmd, cwd=self.rocm_systems_dir)
-        
+
         # If the specific path doesn't work (hip-tests might not be a submodule),
         # fall back to checking if it exists or needs initialization
         if return_code != 0:
@@ -182,11 +209,17 @@ class HipSamplesTest(FunctionalBase):
                 log.info("hip-tests directory exists (not a submodule)")
             else:
                 # Try recursive update from rocm-systems root as fallback
-                log.info("Attempting to initialize all rocm-systems submodules as fallback")
+                log.info(
+                    "Attempting to initialize all rocm-systems submodules as fallback"
+                )
                 fallback_cmd = ["git", "submodule", "update", "--init", "--recursive"]
-                return_code = self.execute_command(fallback_cmd, cwd=self.rocm_systems_dir)
+                return_code = self.execute_command(
+                    fallback_cmd, cwd=self.rocm_systems_dir
+                )
                 if return_code != 0:
-                    log.warning("Failed to initialize rocm-systems submodules, continuing anyway")
+                    log.warning(
+                        "Failed to initialize rocm-systems submodules, continuing anyway"
+                    )
 
         if not self.hip_tests_samples_dir.exists():
             raise TestExecutionError(
@@ -204,35 +237,34 @@ class HipSamplesTest(FunctionalBase):
 
         log.info("Build environment initialized")
 
-
     def _discover_test_structure(self) -> Dict[str, List[str]]:
         """Discover test structure from samples directory.
-        
+
         Handles nested test cases (e.g., 15_static_library/device_functions).
         Only includes directories that have CMakeLists.txt or contain subdirectories with CMakeLists.txt.
-        
+
         Returns:
             Dictionary mapping test suite names to lists of test case names (may include paths like "15_static_library/device_functions")
         """
         test_structure = {}
-        
+
         if not self.hip_tests_samples_dir.exists():
             return test_structure
-        
+
         def discover_test_cases(suite_dir: Path, base_path: Path = None) -> List[str]:
             """Recursively discover test cases in a suite directory."""
             test_cases = []
             if base_path is None:
                 base_path = suite_dir
-            
+
             for test_dir in sorted(suite_dir.iterdir()):
                 if not test_dir.is_dir():
                     continue
-                
+
                 # Skip build directories
                 if test_dir.name == "build":
                     continue
-                
+
                 # Check if this directory has CMakeLists.txt (it's a test case)
                 if (test_dir / "CMakeLists.txt").exists():
                     # Relative path from suite directory
@@ -245,30 +277,30 @@ class HipSamplesTest(FunctionalBase):
                         test_cases.extend(nested_cases)
                     # If no nested cases found, but directory exists, might be a parent dir
                     # Skip it if it doesn't have CMakeLists.txt
-            
+
             return test_cases
-        
+
         # Discover test suites (directories in samples/)
         for suite_dir in sorted(self.hip_tests_samples_dir.iterdir()):
             if not suite_dir.is_dir():
                 continue
-            
+
             suite_name = suite_dir.name
             test_cases = discover_test_cases(suite_dir)
-            
+
             if test_cases:
                 test_structure[suite_name] = test_cases
-        
+
         return test_structure
-    
+
     def _is_cmake_internal_executable(self, exec_path: Path) -> bool:
         """Check if an executable is a CMake internal file that should be skipped.
-        
+
         CMake creates internal test executables during configuration that should not be run.
         """
         exec_name = exec_path.name
         exec_path_str = str(exec_path)
-        
+
         # Skip CMake internal executables
         cmake_patterns = [
             "CMakeDetermineCompiler",
@@ -277,54 +309,54 @@ class HipSamplesTest(FunctionalBase):
             "CMakeCCompiler",
             "CMakeCXXCompiler",
         ]
-        
+
         # Check if path contains CMakeFiles directory
         if "CMakeFiles" in exec_path_str:
             return True
-        
+
         # Check if name matches CMake patterns
         for pattern in cmake_patterns:
             if pattern in exec_name:
                 return True
-        
+
         return False
-    
+
     def _should_skip_executable(self, exec_path: Path) -> bool:
         """Check if an executable should be skipped (not run).
-        
+
         Some executables require command-line arguments or are not meant to be run directly.
         """
         exec_name = exec_path.name
-        
+
         # Skip object files (.o files) - these are not executables
-        if exec_name.endswith('.o'):
+        if exec_name.endswith(".o"):
             return True
-        
+
         # Skip executables from JSON config
         if exec_name in self.skip_executables:
             return True
-        
+
         return False
 
     def _find_executables_in_build(self, test_suite: str, testname: str) -> List[Path]:
         """Find all executables for a test case in the build directory.
-        
+
         Since each sample is built in its own directory, we search in:
         - build_dir/{suite}/{testname}/build/ (where the sample is built)
         - Install location (CMAKE_INSTALL_PREFIX/bin)
-        
+
         Filters out CMake internal executables.
-        
+
         Returns:
             List of executable paths found (excluding CMake internals)
         """
         executables = []
         found_paths = set()  # Avoid duplicates
-        
+
         # Primary location: individual build directory for this sample
         # Build happens in {suite}/{testname}/build/ directory
         sample_build_dir = self.hip_tests_build_dir / test_suite / testname / "build"
-        
+
         # Search locations (in order of preference)
         search_paths = [
             # Individual sample build directory (where we build each sample)
@@ -334,12 +366,12 @@ class HipSamplesTest(FunctionalBase):
             # Install location (CMAKE_INSTALL_PREFIX/bin)
             Path(self.rocm_path) / "bin",
         ]
-        
+
         # Search in each location
         for search_path in search_paths:
             if not search_path.exists():
                 continue
-            
+
             # For build directory, first check top-level (where actual executables are)
             # Then do recursive search but skip CMakeFiles directories
             try:
@@ -348,21 +380,21 @@ class HipSamplesTest(FunctionalBase):
                     for item in search_path.iterdir():
                         if not item.is_file():
                             continue
-                        
+
                         # Skip CMake internal executables
                         if self._is_cmake_internal_executable(item):
                             continue
-                        
+
                         # Skip executables that shouldn't be run
                         if self._should_skip_executable(item):
                             continue
-                        
+
                         # Check if executable
                         if os.access(item, os.X_OK):
                             if item not in found_paths:
                                 executables.append(item)
                                 found_paths.add(item)
-                    
+
                     # Then do recursive search, but skip CMakeFiles directories entirely
                     for item in search_path.rglob("*"):
                         # Skip CMakeFiles directories entirely
@@ -371,15 +403,15 @@ class HipSamplesTest(FunctionalBase):
 
                         if not item.is_file():
                             continue
-                        
+
                         # Skip CMake internal executables (extra safety check)
                         if self._is_cmake_internal_executable(item):
                             continue
-                        
+
                         # Skip executables that shouldn't be run
                         if self._should_skip_executable(item):
                             continue
-                        
+
                         # Check if executable
                         if os.access(item, os.X_OK):
                             if item not in found_paths:
@@ -391,40 +423,43 @@ class HipSamplesTest(FunctionalBase):
                         # Skip CMakeFiles directories entirely
                         if "CMakeFiles" in str(item):
                             continue
-                        
+
                         if not item.is_file():
                             continue
-                        
+
                         # Skip CMake internal executables
                         if self._is_cmake_internal_executable(item):
                             continue
-                        
+
                         # Skip executables that shouldn't be run
                         if self._should_skip_executable(item):
                             continue
-                        
+
                         # Check if executable
                         if os.access(item, os.X_OK):
                             # For install location, match by name pattern
-                            if testname.lower() in item.name.lower() or item.name.lower() in testname.lower():
+                            if (
+                                testname.lower() in item.name.lower()
+                                or item.name.lower() in testname.lower()
+                            ):
                                 if item not in found_paths:
                                     executables.append(item)
                                     found_paths.add(item)
             except (PermissionError, OSError) as e:
                 continue
-        
+
         return executables
 
     def _run_sample(self, test_suite: str, testname: str) -> Dict[str, Any]:
         """Run a single HIP sample and return result.
-        
+
         Executables are already built from the top-level build, so we find and run them.
         """
         log.info(f"Running {test_suite}/{testname}")
 
         # Find all executables for this test case
         executables = self._find_executables_in_build(test_suite, testname)
-        
+
         if not executables:
             log.warning(f"No executables found for {test_suite}/{testname}")
             result = {
@@ -448,7 +483,9 @@ class HipSamplesTest(FunctionalBase):
         for exec_path in executables:
             exec_names.append(exec_path.name)
             cmd = [str(exec_path)]
-            return_code, output = self._execute_command_with_output(cmd, cwd=exec_path.parent, env=env)
+            return_code, output = self._execute_command_with_output(
+                cmd, cwd=exec_path.parent, env=env
+            )
             captured_output.append(output)
 
             # If any executable fails, mark overall as failed
@@ -458,7 +495,9 @@ class HipSamplesTest(FunctionalBase):
                 break
 
         # Parse output to determine status based on return code and output
-        status = self._parse_sample_output(test_suite, testname, overall_return_code, "\n".join(captured_output))
+        status = self._parse_sample_output(
+            test_suite, testname, overall_return_code, "\n".join(captured_output)
+        )
 
         result = {
             "test_suite": test_suite,
@@ -474,10 +513,12 @@ class HipSamplesTest(FunctionalBase):
         log.info(f"Completed {test_suite}/{testname} - Status: {status}")
 
         return result
-    
-    def _execute_command_with_output(self, cmd: List[str], cwd: Path = None, env: Dict[str, str] = None) -> Tuple[int, str]:
+
+    def _execute_command_with_output(
+        self, cmd: List[str], cwd: Path = None, env: Dict[str, str] = None
+    ) -> Tuple[int, str]:
         """Execute a command and capture output for validation.
-        
+
         Returns:
             Tuple of (return_code, output_text)
         """
@@ -507,71 +548,79 @@ class HipSamplesTest(FunctionalBase):
         process.wait()
         return process.returncode, "\n".join(output_lines)
 
-    def _parse_sample_output(self, test_suite: str, testname: str, return_code: int, output: str = "") -> str:
+    def _parse_sample_output(
+        self, test_suite: str, testname: str, return_code: int, output: str = ""
+    ) -> str:
         """Parse sample output to determine test status.
-        
+
         Args:
             test_suite: Test suite name
             testname: Test case name
             return_code: Process return code
             output: Captured stdout/stderr output (unused, kept for potential future use)
-        
+
         Returns:
             Status string: "PASS", "FAIL", "ERROR", or "SKIP"
         """
         # Exit code is the primary and reliable indicator of test status
         if return_code != 0:
             return "FAIL"
-        
+
         return "PASS"
 
     def _should_skip_test(self, test_suite: str, testname: str) -> bool:
         """Check if a test should be skipped based on JSON configuration."""
         if testname not in self.skip_conditions:
             return False
-        
+
         skip_config = self.skip_conditions[testname]
-        
+
         # Check GPU architecture requirement
         if "requires_gpu" in skip_config:
             gfx_id = self.get_gpu_architecture()
             required_gpu = skip_config["requires_gpu"]
             if gfx_id != required_gpu:
-                log.info(f"Skipping {testname} - requires {required_gpu}, current GPU: {gfx_id}")
+                log.info(
+                    f"Skipping {testname} - requires {required_gpu}, current GPU: {gfx_id}"
+                )
                 return True
-        
+
         # Check GPU count requirement
         if "requires_gpu_count" in skip_config:
             gpu_count = self.get_gpu_count()
             required_count = skip_config["requires_gpu_count"]
             if gpu_count < required_count:
-                log.info(f"Skipping {testname} - requires {required_count} GPUs, current GPU count: {gpu_count}")
+                log.info(
+                    f"Skipping {testname} - requires {required_count} GPUs, current GPU count: {gpu_count}"
+                )
                 return True
-        
+
         # Check tool requirement
         if "requires_tool" in skip_config:
             tool_name = skip_config["requires_tool"]
             tool_paths = skip_config.get("tool_paths", [])
-            
+
             # Check in ROCm path first
             rocm_tool_path = self.rocm_path / "llvm" / "bin" / tool_name
             if rocm_tool_path.exists():
                 return False
-            
+
             # Check configured paths
             for tool_path_str in tool_paths:
                 tool_path = Path(tool_path_str)
                 if tool_path.exists():
                     return False
-            
-            log.info(f"Skipping {testname} - {tool_name} not found (requires {skip_config.get('description', 'tool')})")
+
+            log.info(
+                f"Skipping {testname} - {tool_name} not found (requires {skip_config.get('description', 'tool')})"
+            )
             return True
 
         return False
 
     def run_tests(self) -> None:
         """Run HIP samples tests and save results to JSON.
-        
+
         Uses interleaved approach: build one sample, test it, then move to next.
         This provides faster feedback and better error handling.
         """
@@ -593,7 +642,7 @@ class HipSamplesTest(FunctionalBase):
 
         # Discover test structure from samples directory
         test_structure = self._discover_test_structure()
-        
+
         if not test_structure:
             raise TestExecutionError(
                 f"No test suites found in {self.hip_tests_samples_dir}\n"
@@ -604,18 +653,22 @@ class HipSamplesTest(FunctionalBase):
 
         # Build and test each sample together (interleaved approach)
         for test_suite, test_cases in test_structure.items():
-            log.info(f"Processing test suite: {test_suite} ({len(test_cases)} test cases)")
+            log.info(
+                f"Processing test suite: {test_suite} ({len(test_cases)} test cases)"
+            )
 
             for testname in test_cases:
                 # Check if should skip
                 if self._should_skip_test(test_suite, testname):
-                    self.test_results.append({
-                        "test_suite": test_suite,
-                        "test_case": testname,
-                        "command": "",
-                        "return_code": 0,
-                        "status": "SKIP",
-                    })
+                    self.test_results.append(
+                        {
+                            "test_suite": test_suite,
+                            "test_case": testname,
+                            "command": "",
+                            "return_code": 0,
+                            "status": "SKIP",
+                        }
+                    )
                     continue
 
                 # Build and test this sample
@@ -623,7 +676,7 @@ class HipSamplesTest(FunctionalBase):
                     # Build the sample
                     log.info(f"Building {test_suite}/{testname}")
                     self._build_sample(test_suite, testname)
-                    
+
                     # Immediately test the sample we just built
                     result = self._run_sample(test_suite, testname)
                     self.test_results.append(result)
@@ -683,17 +736,19 @@ class HipSamplesTest(FunctionalBase):
             )
 
         test_results = []
-        
+
         for result in json_results:
             status = result.get("status", "ERROR")
-            
+
             # Ensure status is uppercase and valid
             if status.upper() not in ["PASS", "FAIL", "ERROR", "SKIP"]:
-                log.warning(f"Invalid status '{status}' for {result.get('test_case')}, defaulting to ERROR")
+                log.warning(
+                    f"Invalid status '{status}' for {result.get('test_case')}, defaulting to ERROR"
+                )
                 status = "ERROR"
             else:
                 status = status.upper()
-            
+
             test_results.append(
                 self.create_test_result(
                     test_name=self.test_name,
