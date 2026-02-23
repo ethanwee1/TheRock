@@ -24,7 +24,7 @@ sys.path.insert(
 from utils import ExtendedTestClient
 from utils.logger import log
 from utils.exceptions import TestExecutionError, TestResultError
-from github_actions_utils import gha_append_step_summary, get_first_gpu_architecture
+from github_actions_utils import gha_append_step_summary, get_first_gpu_architecture, get_visible_gpu_count
 
 
 class FunctionalBase:
@@ -83,6 +83,18 @@ class FunctionalBase:
         except Exception as e:
             raise TestExecutionError(
                 f"Failed to detect GPU architecture: {e}\n"
+                "Ensure ROCm drivers are installed and GPU is accessible."
+            ) from e
+
+    def get_gpu_count(self) -> int:
+        """Get the number of visible GPUs using rocminfo."""
+        try:
+            gpu_count = get_visible_gpu_count(therock_bin_dir=self.therock_bin_dir)
+            log.info(f"Detected GPU count: {gpu_count}")
+            return gpu_count
+        except Exception as e:
+            raise TestExecutionError(
+                f"Failed to detect GPU count: {e}\n"
                 "Ensure ROCm drivers are installed and GPU is accessible."
             ) from e
 

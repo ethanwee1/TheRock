@@ -28,4 +28,12 @@ functional_matrix = {
         "platform": ["linux"],
         "total_shards": 1,
     },
+    "test_hip_samples": {
+        "job_name": "test_hip_samples",
+        "fetch_artifact_args": "--hip --tests",
+        "timeout_minutes": 60,
+        "test_script": f"python {_get_functional_script_path('test_hip_samples.py')}",
+        "platform": ["linux"],
+        "total_shards": 1,
+    },
 }
