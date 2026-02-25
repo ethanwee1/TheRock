@@ -77,12 +77,12 @@ amdgpu_family_info_matrix_presubmit = {
             "sanity_check_only_for_family": True,
         },
         "windows": {
-            "test-runs-on": "windows-gfx110X-gpu-rocm",
+            "test-runs-on": "test-gfx110X-gpu-rocm",
             "family": "gfx110X-all",
             "fetch-gfx-targets": ["gfx1100"],
             "bypass_tests_for_releases": True,
             "build_variants": ["release"],
-            "sanity_check_only_for_family": True,
+            # "sanity_check_only_for_family": True,
         },
     },
     "gfx1151": {
