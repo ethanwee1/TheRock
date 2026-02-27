@@ -10,6 +10,9 @@ import subprocess
 import sys
 from pathlib import Path
 
+# Some downstream users of these APIs do not expect or handle
+# stdout/stderr output from this code, so logging is disabled by default.
+# See https://github.com/ROCm/TheRock/issues/3109.
 _VERBOSE = os.getenv("ROCM_SDK_VERBOSE", "0") == "1"
 
 CACHED_TARGET_FAMILY: str | None = None
@@ -141,7 +144,11 @@ def discover_current_target_family() -> str | None:
                     return arch
     except subprocess.CalledProcessError as e:
         if _VERBOSE:
-            print(f"[rocm_sdk] offload-arch failed: {e.returncode}", file=sys.stderr)
+            print(
+                f"[rocm_sdk] offload-arch failed with return code {e.returncode}",
+                file=sys.stderr,
+            )
+            print(f"[rocm_sdk] output: {e.output}", file=sys.stderr)
     except FileNotFoundError:
         if _VERBOSE:
             print("[rocm_sdk] offload-arch not found", file=sys.stderr)
